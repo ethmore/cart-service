@@ -149,7 +149,7 @@ func GetCartProducts() gin.HandlerFunc {
 
 		products := []ProductInfo{}
 		for i := 0; i < len(resp.Products); i++ {
-			product, err := GetProductInfo(responseBody.Token, resp.Products[i].Id)
+			product, err := getProductInfo(responseBody.Token, resp.Products[i].Id)
 			product.Qty = resp.Products[i].Qty
 			if err != nil {
 				fmt.Println("product info:", err)
@@ -163,7 +163,7 @@ func GetCartProducts() gin.HandlerFunc {
 	}
 }
 
-func GetProductInfo(token, productId string) (*ProductInfo, error) {
+func getProductInfo(token, productId string) (*ProductInfo, error) {
 	bo := Product{
 		Token: token,
 		Id:    productId,
@@ -202,6 +202,55 @@ func GetProductInfo(token, productId string) (*ProductInfo, error) {
 		return nil, errors.New("response empty")
 	}
 	return &resp.Products, nil
+}
+
+func ChangeProductQty() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var product Product
+		if bodyErr := ctx.ShouldBindBodyWith(&product, binding.JSON); bodyErr != nil {
+			fmt.Println("body: ", bodyErr)
+			ctx.Status(http.StatusInternalServerError)
+			return
+		}
+
+		body, _ := json.Marshal(product)
+		bodyReader := bytes.NewReader(body)
+		requestURL := "http://127.0.0.1:3002/changeProductQty"
+
+		req, err := http.NewRequest(http.MethodPost, requestURL, bodyReader)
+		if err != nil {
+			fmt.Println("client: could not create request", err)
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		client := http.Client{
+			Timeout: 30 * time.Second,
+		}
+		res, err := client.Do(req)
+		if err != nil {
+			fmt.Println("client: error making http request: ", err)
+			return
+		}
+
+		//response
+		b, readErr := io.ReadAll(res.Body)
+		if readErr != nil {
+			fmt.Println(readErr)
+			return
+		}
+		defer res.Body.Close()
+
+		var resp ResponseBody
+		json.Unmarshal([]byte(b), &resp)
+
+		if resp.Message == "" {
+			fmt.Println("response empty")
+			ctx.Status(http.StatusInternalServerError)
+			return
+		}
+		ctx.JSON(http.StatusOK, gin.H{"message": "OK"})
+	}
 }
 
 func RemoveProductFromCart() gin.HandlerFunc {
