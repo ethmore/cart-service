@@ -20,5 +20,7 @@ func main() {
 	// private := router.Group("/")
 	// routes.PrivateRoutes(private)
 
-	router.Run(":3007")
+	if err := router.Run(":3007"); err != nil {
+		panic(err)
+	}
 }

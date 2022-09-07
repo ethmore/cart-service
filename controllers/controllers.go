@@ -92,7 +92,11 @@ func AddToCart() gin.HandlerFunc {
 		defer res.Body.Close()
 
 		var resp ResponseBody
-		json.Unmarshal([]byte(b), &resp)
+		if err := json.Unmarshal([]byte(b), &resp); err != nil {
+			fmt.Println("unmarshal err", err)
+			ctx.Status(http.StatusInternalServerError)
+			return
+		}
 
 		if resp.Message == "" {
 			fmt.Println("response empty")
@@ -140,7 +144,12 @@ func GetCartProducts() gin.HandlerFunc {
 		defer res.Body.Close()
 
 		var resp ResponseBody
-		json.Unmarshal([]byte(b), &resp)
+		if err := json.Unmarshal([]byte(b), &resp); err != nil {
+			fmt.Println("unmarshal err", err)
+			ctx.Status(http.StatusInternalServerError)
+			return
+		}
+
 		if resp.Message == "" {
 			fmt.Println("response empty")
 			ctx.Status(http.StatusInternalServerError)
@@ -194,8 +203,12 @@ func getProductInfo(token, productId string) (*ProductInfo, error) {
 		return nil, err
 	}
 	defer res.Body.Close()
+
 	var resp GetProductResponse
-	json.Unmarshal([]byte(b), &resp)
+	if err := json.Unmarshal([]byte(b), &resp); err != nil {
+		fmt.Println("unmarshal err: ", err)
+		return nil, err
+	}
 
 	if resp.Products.Id == "" {
 		fmt.Println("response empty")
@@ -242,7 +255,11 @@ func ChangeProductQty() gin.HandlerFunc {
 		defer res.Body.Close()
 
 		var resp ResponseBody
-		json.Unmarshal([]byte(b), &resp)
+		if err := json.Unmarshal([]byte(b), &resp); err != nil {
+			fmt.Println("unmarshal err", err)
+			ctx.Status(http.StatusInternalServerError)
+			return
+		}
 
 		if resp.Message == "" {
 			fmt.Println("response empty")
@@ -291,7 +308,11 @@ func RemoveProductFromCart() gin.HandlerFunc {
 		defer res.Body.Close()
 
 		var resp DefaultResponse
-		json.Unmarshal([]byte(b), &resp)
+		if err := json.Unmarshal([]byte(b), &resp); err != nil {
+			fmt.Println("unmarshal err", err)
+			ctx.Status(http.StatusInternalServerError)
+			return
+		}
 
 		if resp.Message == "" {
 			fmt.Println("response empty")
@@ -340,7 +361,11 @@ func IncreaseProductQty() gin.HandlerFunc {
 		defer res.Body.Close()
 
 		var resp ResponseBody
-		json.Unmarshal([]byte(b), &resp)
+		if err := json.Unmarshal([]byte(b), &resp); err != nil {
+			fmt.Println("unmarshal err", err)
+			ctx.Status(http.StatusInternalServerError)
+			return
+		}
 
 		if resp.Message == "" {
 			fmt.Println("response empty")
@@ -389,7 +414,11 @@ func DecreaseProductQty() gin.HandlerFunc {
 		defer res.Body.Close()
 
 		var resp ResponseBody
-		json.Unmarshal([]byte(b), &resp)
+		if err := json.Unmarshal([]byte(b), &resp); err != nil {
+			fmt.Println("unmarshal err", err)
+			ctx.Status(http.StatusInternalServerError)
+			return
+		}
 
 		if resp.Message == "" {
 			fmt.Println("response empty")
@@ -480,7 +509,11 @@ func GetTotalPrice() gin.HandlerFunc {
 		defer res.Body.Close()
 
 		var resp PurchaseBody
-		json.Unmarshal([]byte(b), &resp)
+		if err := json.Unmarshal([]byte(b), &resp); err != nil {
+			fmt.Println("unmarshal err", err)
+			ctx.Status(http.StatusInternalServerError)
+			return
+		}
 
 		ctx.JSON(http.StatusOK, gin.H{"message": "OK", "totalPrice": resp.TotalPrice})
 	}
