@@ -1,471 +1,105 @@
 package controllers
 
 import (
-	"bytes"
-	"encoding/json"
-	"errors"
+	"cart/services"
 	"fmt"
-	"io"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 )
 
-type DefaultResponse struct {
-	Status  string
-	Message string
-}
-
-type Product struct {
-	Token string
-	Id    string
-	Qty   string
-}
-
-type ResponseBody struct {
-	Message  string
-	Products []ProductResponse
-}
-
-type ProductResponse struct {
-	Id  string
-	Qty string
-}
-
-type ProductInfo struct {
-	Id          string
-	Title       string
-	Price       string
-	Description string
-	Image       string
-	Stock       string
-	Qty         string
-}
-
-type GetProductResponse struct {
-	Message  string
-	Products ProductInfo
-}
-
-type PurchaseBody struct {
-	Token      string
-	TotalPrice string
-}
-
 func AddToCart() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		var product Product
+		var product services.Product
 		if bodyErr := ctx.ShouldBindBodyWith(&product, binding.JSON); bodyErr != nil {
 			fmt.Println("body: ", bodyErr)
 			ctx.Status(http.StatusInternalServerError)
 			return
 		}
 
-		body, _ := json.Marshal(product)
-		bodyReader := bytes.NewReader(body)
-		requestURL := "http://127.0.0.1:3002/addProductToCart"
-
-		req, err := http.NewRequest(http.MethodPost, requestURL, bodyReader)
-		if err != nil {
-			fmt.Println("client: could not create request", err)
-			return
-		}
-		req.Header.Set("Content-Type", "application/json")
-
-		client := http.Client{
-			Timeout: 30 * time.Second,
-		}
-		res, err := client.Do(req)
-		if err != nil {
-			fmt.Println("client: error making http request: ", err)
-			return
-		}
-
-		//response
-		b, readErr := io.ReadAll(res.Body)
-		if readErr != nil {
-			fmt.Println(readErr)
-			return
-		}
-		defer res.Body.Close()
-
-		var resp ResponseBody
-		if err := json.Unmarshal([]byte(b), &resp); err != nil {
-			fmt.Println("unmarshal err", err)
+		if err := services.AddToCart(product); err != nil {
+			fmt.Println("AddToCart: ", err)
 			ctx.Status(http.StatusInternalServerError)
 			return
 		}
 
-		if resp.Message == "" {
-			fmt.Println("response empty")
-			ctx.Status(http.StatusInternalServerError)
-			return
-		}
 		ctx.JSON(http.StatusOK, gin.H{"message": "OK"})
 	}
 }
 
 func GetCartProducts() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		var responseBody Product
+		var responseBody services.Product
 		if bodyErr := ctx.ShouldBindBodyWith(&responseBody, binding.JSON); bodyErr != nil {
 			fmt.Println("body: ", bodyErr)
 			ctx.Status(http.StatusInternalServerError)
 			return
 		}
 
-		body, _ := json.Marshal(responseBody)
-		bodyReader := bytes.NewReader(body)
-		requestUrl := "http://127.0.0.1:3002/getCartProducts"
-
-		req, err := http.NewRequest(http.MethodPost, requestUrl, bodyReader)
+		message, products, err := services.GetCartProducts(responseBody)
 		if err != nil {
-			fmt.Println("client could not create request", err)
-			return
-		}
-		req.Header.Set("Content-Type", "application/json")
-
-		client := http.Client{
-			Timeout: 30 * time.Second,
-		}
-		res, err := client.Do(req)
-		if err != nil {
-			fmt.Println("client error making http request: ", err)
+			fmt.Println("GetCartProducts", err)
+			ctx.JSON(http.StatusInternalServerError, gin.H{})
 			return
 		}
 
-		b, readErr := io.ReadAll(res.Body)
-		if readErr != nil {
-			fmt.Println(readErr)
-			return
-		}
-		defer res.Body.Close()
-
-		var resp ResponseBody
-		if err := json.Unmarshal([]byte(b), &resp); err != nil {
-			fmt.Println("unmarshal err", err)
-			ctx.Status(http.StatusInternalServerError)
-			return
-		}
-
-		if resp.Message == "" {
-			fmt.Println("response empty")
-			ctx.Status(http.StatusInternalServerError)
-			return
-		}
-
-		products := []ProductInfo{}
-		for i := 0; i < len(resp.Products); i++ {
-			product, err := getProductInfo(responseBody.Token, resp.Products[i].Id)
-			product.Qty = resp.Products[i].Qty
-			if err != nil {
-				fmt.Println("product info:", err)
-				ctx.Status(http.StatusInternalServerError)
-				return
-			}
-			products = append(products, *product)
-		}
-		fmt.Println(products)
-		ctx.JSON(200, gin.H{"message": resp.Message, "products": products})
+		ctx.JSON(200, gin.H{"message": message, "products": products})
 	}
-}
-
-func getProductInfo(token, productId string) (*ProductInfo, error) {
-	bo := Product{
-		Token: token,
-		Id:    productId,
-	}
-	body, _ := json.Marshal(bo)
-	bodyReader := bytes.NewReader(body)
-	requestUrl := "http://127.0.0.1:3002/getProduct"
-
-	req, err := http.NewRequest(http.MethodPost, requestUrl, bodyReader)
-	if err != nil {
-		fmt.Println("client: could not create request", err)
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	client := http.Client{
-		Timeout: 30 * time.Second,
-	}
-	res, err := client.Do(req)
-	if err != nil {
-		fmt.Println("client: error making http request: ", err)
-		return nil, err
-	}
-
-	//response
-	b, readErr := io.ReadAll(res.Body)
-	if readErr != nil {
-		fmt.Println(readErr)
-		return nil, err
-	}
-	defer res.Body.Close()
-
-	var resp GetProductResponse
-	if err := json.Unmarshal([]byte(b), &resp); err != nil {
-		fmt.Println("unmarshal err: ", err)
-		return nil, err
-	}
-
-	if resp.Products.Id == "" {
-		fmt.Println("response empty")
-		return nil, errors.New("response empty")
-	}
-	return &resp.Products, nil
 }
 
 func ChangeProductQty() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		var product Product
+		var product services.Product
 		if bodyErr := ctx.ShouldBindBodyWith(&product, binding.JSON); bodyErr != nil {
 			fmt.Println("body: ", bodyErr)
 			ctx.Status(http.StatusInternalServerError)
 			return
 		}
 
-		body, _ := json.Marshal(product)
-		bodyReader := bytes.NewReader(body)
-		requestURL := "http://127.0.0.1:3002/changeProductQty"
-
-		req, err := http.NewRequest(http.MethodPost, requestURL, bodyReader)
-		if err != nil {
-			fmt.Println("client: could not create request", err)
-			return
-		}
-		req.Header.Set("Content-Type", "application/json")
-
-		client := http.Client{
-			Timeout: 30 * time.Second,
-		}
-		res, err := client.Do(req)
-		if err != nil {
-			fmt.Println("client: error making http request: ", err)
-			return
-		}
-
-		//response
-		b, readErr := io.ReadAll(res.Body)
-		if readErr != nil {
-			fmt.Println(readErr)
-			return
-		}
-		defer res.Body.Close()
-
-		var resp ResponseBody
-		if err := json.Unmarshal([]byte(b), &resp); err != nil {
-			fmt.Println("unmarshal err", err)
+		if err := services.ChangeProductQty(product); err != nil {
+			fmt.Println("ChangeProductQty: ", err)
 			ctx.Status(http.StatusInternalServerError)
 			return
 		}
 
-		if resp.Message == "" {
-			fmt.Println("response empty")
-			ctx.Status(http.StatusInternalServerError)
-			return
-		}
 		ctx.JSON(http.StatusOK, gin.H{"message": "OK"})
 	}
 }
 
 func RemoveProductFromCart() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		var fBody Product
-		if bodyErr := ctx.ShouldBindBodyWith(&fBody, binding.JSON); bodyErr != nil {
+		var productBody services.Product
+		if bodyErr := ctx.ShouldBindBodyWith(&productBody, binding.JSON); bodyErr != nil {
 			fmt.Println("body: ", bodyErr)
 			ctx.Status(http.StatusInternalServerError)
 			return
 		}
 
-		body, _ := json.Marshal(fBody)
-		bodyReader := bytes.NewReader(body)
-		requestUrl := "http://127.0.0.1:3002/removeProductFromCart"
-
-		req, err := http.NewRequest(http.MethodPost, requestUrl, bodyReader)
-		if err != nil {
-			fmt.Println("client: could not create request", err)
-			return
-		}
-		req.Header.Set("Content-Type", "application/json")
-
-		client := http.Client{
-			Timeout: 30 * time.Second,
-		}
-
-		res, err := client.Do(req)
-		if err != nil {
-			fmt.Println("client: error making http request: ", err)
-			return
-		}
-
-		b, readErr := io.ReadAll(res.Body)
-		if readErr != nil {
-			fmt.Println(readErr)
-			return
-		}
-		defer res.Body.Close()
-
-		var resp DefaultResponse
-		if err := json.Unmarshal([]byte(b), &resp); err != nil {
-			fmt.Println("unmarshal err", err)
+		if removeErr := services.RemoveProductFromCart(productBody); removeErr != nil {
+			fmt.Println("RemoveProductFromCart: ", removeErr)
 			ctx.Status(http.StatusInternalServerError)
 			return
 		}
 
-		if resp.Message == "" {
-			fmt.Println("response empty")
-			ctx.Status(http.StatusInternalServerError)
-			return
-		}
-		ctx.JSON(http.StatusOK, gin.H{"message": "OK"})
-	}
-}
-
-func IncreaseProductQty() gin.HandlerFunc {
-	return func(ctx *gin.Context) {
-		var product Product
-		if bodyErr := ctx.ShouldBindBodyWith(&product, binding.JSON); bodyErr != nil {
-			fmt.Println("body: ", bodyErr)
-			ctx.Status(http.StatusInternalServerError)
-			return
-		}
-
-		body, _ := json.Marshal(product)
-		bodyReader := bytes.NewReader(body)
-		requestURL := "http://127.0.0.1:3002/increaseProductQty"
-
-		req, err := http.NewRequest(http.MethodPost, requestURL, bodyReader)
-		if err != nil {
-			fmt.Println("client: could not create request", err)
-			return
-		}
-		req.Header.Set("Content-Type", "application/json")
-
-		client := http.Client{
-			Timeout: 30 * time.Second,
-		}
-		res, err := client.Do(req)
-		if err != nil {
-			fmt.Println("client: error making http request: ", err)
-			return
-		}
-
-		//response
-		b, readErr := io.ReadAll(res.Body)
-		if readErr != nil {
-			fmt.Println(readErr)
-			return
-		}
-		defer res.Body.Close()
-
-		var resp ResponseBody
-		if err := json.Unmarshal([]byte(b), &resp); err != nil {
-			fmt.Println("unmarshal err", err)
-			ctx.Status(http.StatusInternalServerError)
-			return
-		}
-
-		if resp.Message == "" {
-			fmt.Println("response empty")
-			ctx.Status(http.StatusInternalServerError)
-			return
-		}
-		ctx.JSON(http.StatusOK, gin.H{"message": "OK"})
-	}
-}
-
-func DecreaseProductQty() gin.HandlerFunc {
-	return func(ctx *gin.Context) {
-		var product Product
-		if bodyErr := ctx.ShouldBindBodyWith(&product, binding.JSON); bodyErr != nil {
-			fmt.Println("body: ", bodyErr)
-			ctx.Status(http.StatusInternalServerError)
-			return
-		}
-
-		body, _ := json.Marshal(product)
-		bodyReader := bytes.NewReader(body)
-		requestURL := "http://127.0.0.1:3002/decreaseProductQty"
-
-		req, err := http.NewRequest(http.MethodPost, requestURL, bodyReader)
-		if err != nil {
-			fmt.Println("client: could not create request", err)
-			return
-		}
-		req.Header.Set("Content-Type", "application/json")
-
-		client := http.Client{
-			Timeout: 30 * time.Second,
-		}
-		res, err := client.Do(req)
-		if err != nil {
-			fmt.Println("client: error making http request: ", err)
-			return
-		}
-
-		//response
-		b, readErr := io.ReadAll(res.Body)
-		if readErr != nil {
-			fmt.Println(readErr)
-			return
-		}
-		defer res.Body.Close()
-
-		var resp ResponseBody
-		if err := json.Unmarshal([]byte(b), &resp); err != nil {
-			fmt.Println("unmarshal err", err)
-			ctx.Status(http.StatusInternalServerError)
-			return
-		}
-
-		if resp.Message == "" {
-			fmt.Println("response empty")
-			ctx.Status(http.StatusInternalServerError)
-			return
-		}
 		ctx.JSON(http.StatusOK, gin.H{"message": "OK"})
 	}
 }
 
 func ToPurchase() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		var purchaseBody PurchaseBody
+		var purchaseBody services.PurchaseBody
 		if bodyErr := ctx.ShouldBindBodyWith(&purchaseBody, binding.JSON); bodyErr != nil {
 			fmt.Println("body: ", bodyErr)
+			ctx.Status(http.StatusInternalServerError)
 			return
 		}
 
-		body, _ := json.Marshal(purchaseBody)
-		bodyReader := bytes.NewReader(body)
-		requestUrl := "http://127.0.0.1:3002/addTotalToCart"
-
-		req, err := http.NewRequest(http.MethodPost, requestUrl, bodyReader)
-		if err != nil {
-			fmt.Println("client: could not create request", err)
+		if err := services.AddTotalToCart(purchaseBody); err != nil {
+			fmt.Println("AddTotalToCart", err)
+			ctx.Status(http.StatusInternalServerError)
 			return
 		}
-		req.Header.Set("Content-Type", "application/json")
-
-		client := http.Client{
-			Timeout: 30 * time.Second,
-		}
-		res, err := client.Do(req)
-		if err != nil {
-			fmt.Println("client: error making http request: ", err)
-			return
-		}
-
-		b, readErr := io.ReadAll(res.Body)
-		if readErr != nil {
-			fmt.Println(readErr)
-			return
-		}
-		defer res.Body.Close()
-
-		fmt.Println(b)
-		//...
 
 		ctx.JSON(http.StatusOK, gin.H{"message": "OK"})
 	}
@@ -473,48 +107,20 @@ func ToPurchase() gin.HandlerFunc {
 
 func GetTotalPrice() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		var response PurchaseBody
+		var response services.PurchaseBody
 		if bodyErr := ctx.ShouldBindBodyWith(&response, binding.JSON); bodyErr != nil {
 			fmt.Println("body: ", bodyErr)
 			ctx.Status(http.StatusInternalServerError)
 			return
 		}
 
-		body, _ := json.Marshal(response)
-		bodyReader := bytes.NewReader(body)
-		requestURL := "http://127.0.0.1:3002/getTotalPrice"
-
-		req, err := http.NewRequest(http.MethodPost, requestURL, bodyReader)
-		if err != nil {
-			fmt.Println("client: could not create request", err)
-			return
-		}
-		req.Header.Set("Content-Type", "application/json")
-
-		client := http.Client{
-			Timeout: 30 * time.Second,
-		}
-		res, err := client.Do(req)
-		if err != nil {
-			fmt.Println("client: error making http request: ", err)
-			return
-		}
-
-		//response
-		b, readErr := io.ReadAll(res.Body)
-		if readErr != nil {
-			fmt.Println(readErr)
-			return
-		}
-		defer res.Body.Close()
-
-		var resp PurchaseBody
-		if err := json.Unmarshal([]byte(b), &resp); err != nil {
-			fmt.Println("unmarshal err", err)
+		totalPrice, getErr := services.GetTotalPrice(response)
+		if getErr != nil {
+			fmt.Println("GetTotalPrice: ", getErr)
 			ctx.Status(http.StatusInternalServerError)
 			return
 		}
 
-		ctx.JSON(http.StatusOK, gin.H{"message": "OK", "totalPrice": resp.TotalPrice})
+		ctx.JSON(http.StatusOK, gin.H{"message": "OK", "totalPrice": totalPrice})
 	}
 }
