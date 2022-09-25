@@ -28,7 +28,7 @@ go run .
 
 ## Test
 ```
-curl http://localhost:3002/test
+curl http://localhost:3007/test
 ```
 ### It should return:
 ```
