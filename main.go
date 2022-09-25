@@ -1,8 +1,8 @@
 package main
 
 import (
-	"cart/dotEnv"
-	"cart/routes"
+	"cart-service/dotEnv"
+	"cart-service/routes"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"

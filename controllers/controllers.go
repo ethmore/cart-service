@@ -1,7 +1,7 @@
 package controllers
 
 import (
-	"cart/services"
+	"cart-service/services"
 	"fmt"
 	"net/http"
 
