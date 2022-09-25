@@ -9,6 +9,12 @@ import (
 	"github.com/gin-gonic/gin/binding"
 )
 
+func Test() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		ctx.JSON(http.StatusOK, gin.H{"message": "OK"})
+	}
+}
+
 func AddToCart() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		var product services.Product
