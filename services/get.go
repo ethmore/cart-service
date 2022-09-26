@@ -37,8 +37,7 @@ type ProductInfo struct {
 }
 
 type GetProductResponse struct {
-	Message  string
-	Products ProductInfo
+	Products ProductInfo `json:"product"`
 }
 
 func GetCartProducts(responseBody Product) (string, []ProductInfo, error) {
